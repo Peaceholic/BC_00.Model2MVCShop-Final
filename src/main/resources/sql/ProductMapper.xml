@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="ProductMapper">
+ 	
+ 	
+	<resultMap id="productSelectMap" type="product">
+		<result property="prodNo" 			column="prod_no" 		  	jdbcType="NUMERIC"/>
+		<result property="prodName"			column="prod_name" 		  	jdbcType="VARCHAR"/>
+		<result property="prodDetail" 		column="prod_detail" 	  	jdbcType="VARCHAR"/>
+		<result property="manuDate" 		column="manufacture_day"  	jdbcType="VARCHAR"/>
+		<result property="price" 			column="price" 			  	jdbcType="NUMERIC"/>
+		<result property="fileName" 		column="image_file" 	  	jdbcType="VARCHAR"/>
+		<result property="regDate" 			column="reg_date" 		 	jdbcType="DATE"/>
+		<result property="proTranCode" 		column="tran_status_code" 	jdbcType="CHAR"/>
+	</resultMap>
+	
+	<resultMap id="bookSelectMap" type="book">
+		<result property="bookNo" 			column="bookNo" 		  	jdbcType="NUMERIC"/>
+		<result property="requestNo"		column="requestNo" 		  	jdbcType="NUMERIC"/>
+		<result property="reqDate" 			column="reqDate" 		  	jdbcType="DATE"/>
+		<result property="doneDate"			column="doneDate" 	  		jdbcType="DATE"/>
+		<result property="title" 			column="title" 	  			jdbcType="VARCHAR"/>
+		<result property="contents" 		column="contents"  			jdbcType="VARCHAR"/>
+		<result property="url" 				column="url" 			  	jdbcType="VARCHAR"/>
+		<result property="isbn" 			column="isbn" 	  			jdbcType="VARCHAR"/>
+		<result property="datetime" 		column="datetime" 		 	jdbcType="DATE" />
+		<result property="authors" 			column="authors" 			jdbcType="VARCHAR"/>
+		<result property="publisher" 		column="publisher" 			jdbcType="VARCHAR"/>
+		<result property="translators" 		column="translators" 		jdbcType="VARCHAR"/>
+		<result property="price" 			column="price" 				jdbcType="VARCHAR"/>
+		<result property="sale_price" 		column="sale_price" 		jdbcType="VARCHAR"/>
+		<result property="thumbnail" 		column="thumbnail" 			jdbcType="VARCHAR"/>
+		<result property="status" 			column="status" 			jdbcType="VARCHAR"/>
+	</resultMap>
+	
+	<!-- SQL : INSERT -->
+	<insert id="addProduct"	parameterType="product" >
+	 	INSERT
+		INTO product( prod_no, prod_name, prod_detail, manufacture_day, price, image_file, reg_date) 
+		VALUES	 (	seq_product_prod_no.nextval
+					, #{prodName:VARCHAR} 
+					, #{prodDetail:VARCHAR} 
+					, #{manuDate:VARCHAR} 
+					, #{price:NUMERIC} 
+					, #{fileName:VARCHAR}
+					, SYSDATE	)
+	 </insert>
+	  
+	<!-- SQL : SELECT ONE -->
+	<select id="getProduct"	parameterType="int"	resultMap="productSelectMap">
+		SELECT 	p.prod_no 
+				, p.prod_name 
+				, p.prod_detail 
+				, p.manufacture_day 
+				, p.price 
+				, p.image_file 
+				, p.reg_date 	
+				, t.tran_status_code
+		FROM product p, transaction t
+		WHERE p.prod_no = t.prod_no(+) 
+			and p.prod_no = #{value}
+	 </select>
+	 
+	
+	<!-- SQL : SELECT ONE -->
+	<select id="findLastProduct" resultMap="productSelectMap">
+		SELECT ROWNUM, x.*
+ 		 FROM ( SELECT p.* FROM product p ORDER BY p.prod_no DESC ) x 
+		WHERE ROWNUM = 1 
+	</select>
+	 
+	 
+	 
+	 <!-- SQL : UPDATE -->
+	 <update	id="updateProduct"	parameterType="product" >
+	   	UPDATE product
+	   	<set>
+	   		PROD_NAME 			= #{prodName:VARCHAR}
+			, PROD_DETAIL		= #{prodDetail:VARCHAR}
+			, MANUFACTURE_DAY 	= #{manuDate:VARCHAR}
+			, PRICE				= #{price:NUMERIC}
+			, IMAGE_FILE		= #{fileName:VARCHAR}
+	   	</set>
+	   	WHERE prod_no = #{prodNo}
+	 </update>
+		 
+	 
+	 <select  id="getProductList"  parameterType="search"	resultMap="productSelectMap">
+	  	SELECT *
+	  	FROM (	SELECT inner_table.* , ROWNUM AS row_seq
+	  			FROM	(	SELECT p.prod_no, p.prod_name, p.price, p.reg_date, t.tran_status_code
+							FROM product p, transaction t
+							WHERE p.prod_no = t.prod_no(+)	
+								<if test="searchCondition != null">
+									<if test="searchCondition == 0 and searchKeyword !='' ">
+					 					AND p.prod_no LIKE '%'||#{searchKeyword}||'%'
+									</if>
+									<if test="searchCondition == 1 and searchKeyword !='' ">
+						 				AND prod_name LIKE '%'||#{searchKeyword}||'%'
+
+									</if>
+									<if test="searchCondition == 2 and searchKeyword !='' ">
+						 				AND price LIKE '%'||#{searchKeyword}||'%'
+
+									</if>										
+								</if>													
+								ORDER BY prod_no ) inner_table
+						WHERE ROWNUM &lt;= #{endRowNum} )
+		WHERE row_seq BETWEEN #{startRowNum} AND #{endRowNum}		
+	 </select>
+	 	 
+	 	<!--  위 두번째 subQuery 의  
+	 			WHERE ROWNUM &lt;= #{endRowNum} ) 는
+	 			WHERE ROWNUM <= #{endRowNum} ) 의미이며..
+	 			< 는 keyword 로 &lt; 를	사용.
+	 			
+	 			<![CDATA[  ~~~  ]]> 를 이용하여 아래와 같이 사용  할 수 있다.
+	 			CDATA ==> Character Data 의 의미 Java 에서 \n 같은 특수문자 처리  
+
+				WHERE ROWNUM <![CDATA[ <=]]> #{endRowNum} )
+		-->
+	
+	<!-- SQL : SELECT ROW Count -->	 
+	<select  id="getTotalCount"  parameterType="search"	 resultType="int">
+	  	SELECT COUNT(*)
+	  	FROM(	SELECT p.prod_no, p.prod_name, p.price, p.reg_date, t.tran_status_code
+				FROM product p, transaction t
+				WHERE p.prod_no = t.prod_no(+)
+					<if test="searchCondition != null">
+							<if test="searchCondition == 0 and searchKeyword !='' ">
+					 			and prod_no = #{searchKeyword}
+							</if>
+							<if test="searchCondition == 1 and searchKeyword !='' ">
+								and prod_name = #{searchKeyword}
+							</if>
+							<if test="searchCondition == 2 and searchKeyword !='' ">
+								and PRICE = #{searchKeyword}
+							</if>							
+					</if> ) countTable						
+	</select>	
+	
+	<!-- Request SQL -->	
+	
+	<!-- SQL : INSERT -->
+	<insert id="requestProduct"	parameterType="book" >
+	 	INSERT
+		INTO book( bookNo, requestNo, reqDate, doneDate, title, contents, url, isbn, datetime, authors, publisher, translators, price, sale_price, thumbnail, status) 
+		VALUES	 (	seq_book_bookNo.nextval
+					, #{requestNo:NUMERIC} 
+					, SYSDATE
+					, #{doneDate:VARCHAR} 
+					, #{title:VARCHAR} 
+					, #{contents:VARCHAR} 
+					, #{url:VARCHAR} 
+					, #{isbn:VARCHAR} 
+					, #{datetime:VARCHAR} 
+					, #{authors:VARCHAR}
+					, #{publisher:VARCHAR} 
+					, #{translators:VARCHAR} 
+					, #{price:VARCHAR} 
+					, #{sale_price:VARCHAR} 
+					, #{thumbnail:VARCHAR} 
+					, #{status:VARCHAR} )
+	</insert> 
+	 
+	<!-- Request SQL -->	 	
+	<select  id="getRequestList"  parameterType="search"	resultMap="bookSelectMap">
+	  		SELECT *
+	  			FROM (	SELECT inner_table.* , ROWNUM AS row_seq
+	  				FROM	(	SELECT *
+								FROM book																				
+								ORDER BY bookNo ) inner_table
+						WHERE ROWNUM &lt;= #{endRowNum} )
+			WHERE row_seq BETWEEN #{startRowNum} AND #{endRowNum}		
+	</select>
+	 
+	<!-- SQL : SELECT ROW Count -->	 	 	
+	<select  id="getRequestTotalCount"  parameterType="search"	 resultType="int">
+	  		SELECT COUNT(*) FROM book								
+	</select>	 
+	 	
+	<!-- SQL : SELECT ONE -->
+	<select id="getRequest"	parameterType="int"	resultMap="bookSelectMap">
+		SELECT * FROM book WHERE bookNo = #{value}
+	 </select>
+	 
+	 <!-- SQL : UPDATE -->
+	 <update	id="doneRequest"	parameterType="book" >
+	   	UPDATE book
+	   	<set>
+	   		requestNo 	= 1
+			, doneDate	= SYSDATE
+	   	</set>
+	   	WHERE bookNo = #{bookNo}
+	 </update>
+	 
+</mapper>
